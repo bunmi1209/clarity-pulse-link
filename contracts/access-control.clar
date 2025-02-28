@@ -9,19 +9,57 @@
   { authorized: bool }
 )
 
+;; Events
+(define-data-var last-event-id uint u0)
+(define-map access-events
+  uint
+  {
+    user: principal,
+    provider: principal,
+    action: (string-utf8 10),
+    timestamp: uint
+  }
+)
+
 ;; Public functions
 (define-public (grant-access (provider principal))
-  (ok (map-set authorized-providers
-    { user: tx-sender, provider: provider }
-    { authorized: true }
-  ))
+  (let
+    ((timestamp (unwrap! (get-block-info? time (- block-height u1)) err-unauthorized)))
+    (map-set authorized-providers
+      { user: tx-sender, provider: provider }
+      { authorized: true }
+    )
+    (var-set last-event-id (+ (var-get last-event-id) u1))
+    (map-set access-events (var-get last-event-id)
+      {
+        user: tx-sender,
+        provider: provider,
+        action: "grant",
+        timestamp: timestamp
+      }
+    )
+    (ok true)
+  )
 )
 
 (define-public (revoke-access (provider principal))
-  (ok (map-set authorized-providers
-    { user: tx-sender, provider: provider }
-    { authorized: false }
-  ))
+  (let
+    ((timestamp (unwrap! (get-block-info? time (- block-height u1)) err-unauthorized)))
+    (map-set authorized-providers
+      { user: tx-sender, provider: provider }
+      { authorized: false }
+    )
+    (var-set last-event-id (+ (var-get last-event-id) u1))
+    (map-set access-events (var-get last-event-id)
+      {
+        user: tx-sender,
+        provider: provider,
+        action: "revoke",
+        timestamp: timestamp
+      }
+    )
+    (ok true)
+  )
 )
 
 ;; Read only functions

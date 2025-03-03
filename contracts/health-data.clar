@@ -5,10 +5,13 @@
 (define-constant err-unauthorized (err u100))
 (define-constant err-invalid-data (err u101))
 (define-constant err-invalid-range (err u102))
+(define-constant err-no-access (err u103))
 
 ;; Data validation constants
 (define-constant max-heart-rate u220)
+(define-constant min-heart-rate u30)
 (define-constant max-daily-steps u100000)
+(define-constant min-daily-steps u0)
 
 ;; Data structures
 (define-map health-records
@@ -29,18 +32,25 @@
     user: principal,
     heart-rate: uint,
     steps: uint,
-    timestamp: uint
+    timestamp: uint,
+    success: bool
   }
 )
 
 ;; Private functions
 (define-private (validate-health-data (heart-rate uint) (steps uint))
   (if (and
+    (>= heart-rate min-heart-rate)
     (<= heart-rate max-heart-rate)
+    (>= steps min-daily-steps)
     (<= steps max-daily-steps))
     (ok true)
     err-invalid-range
   )
+)
+
+(define-private (check-provider-access (provider principal))
+  (contract-call? .access-control check-access tx-sender provider)
 )
 
 ;; Public functions
@@ -69,7 +79,8 @@
         user: user,
         heart-rate: heart-rate,
         steps: steps,
-        timestamp: timestamp
+        timestamp: timestamp,
+        success: true
       }
     )
     (ok true)

@@ -2,6 +2,7 @@
 
 ;; Constants
 (define-constant err-unauthorized (err u100))
+(define-constant err-already-set (err u101))
 
 ;; Data structures
 (define-map authorized-providers
@@ -17,14 +18,29 @@
     user: principal,
     provider: principal,
     action: (string-utf8 10),
-    timestamp: uint
+    timestamp: uint,
+    success: bool
   }
+)
+
+;; Private functions
+(define-private (verify-access-status (provider principal) (expected-status bool))
+  (let ((current-status (get authorized (default-to 
+    { authorized: false }
+    (map-get? authorized-providers { user: tx-sender, provider: provider })))))
+    (if (is-eq current-status expected-status)
+      err-already-set
+      (ok true))
+  )
 )
 
 ;; Public functions
 (define-public (grant-access (provider principal))
   (let
-    ((timestamp (unwrap! (get-block-info? time (- block-height u1)) err-unauthorized)))
+    (
+      (timestamp (unwrap! (get-block-info? time (- block-height u1)) err-unauthorized))
+      (status-check (try! (verify-access-status provider true)))
+    )
     (map-set authorized-providers
       { user: tx-sender, provider: provider }
       { authorized: true }
@@ -35,7 +51,8 @@
         user: tx-sender,
         provider: provider,
         action: "grant",
-        timestamp: timestamp
+        timestamp: timestamp,
+        success: true
       }
     )
     (ok true)
@@ -44,7 +61,10 @@
 
 (define-public (revoke-access (provider principal))
   (let
-    ((timestamp (unwrap! (get-block-info? time (- block-height u1)) err-unauthorized)))
+    (
+      (timestamp (unwrap! (get-block-info? time (- block-height u1)) err-unauthorized))
+      (status-check (try! (verify-access-status provider false)))
+    )
     (map-set authorized-providers
       { user: tx-sender, provider: provider }
       { authorized: false }
@@ -55,7 +75,8 @@
         user: tx-sender,
         provider: provider,
         action: "revoke",
-        timestamp: timestamp
+        timestamp: timestamp,
+        success: true
       }
     )
     (ok true)
